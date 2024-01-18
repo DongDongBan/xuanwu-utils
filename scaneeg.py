@@ -20,6 +20,14 @@ from shutil import disk_usage
 
 __author__ = 'github.com/DongDongBan'
 
+from collections import Counter
+# Debug 代码
+def count_values(sequence):
+    counter = Counter()
+    for item in sequence:
+        counter[item] += 1
+    return counter    
+
 def scan_sort(dbpath: str) -> Dict: 
     print('将在%s中搜索数据包……' % dbpath)
     pat_2_path = dict() # dict(SHORTNAME=(dbpath[:4]+".."+dbpath[-4:] if len(dbpath) > 10 else dbpath), children=[])
@@ -30,17 +38,40 @@ def scan_sort(dbpath: str) -> Dict:
     # pp.pprint(pat_2_path)
 
     for pat, rec_lst in pat_2_path.items(): 
-        print(f"扫描到患者{pat}包括{len(rec_lst)}个目录")
+        print(f"扫描到患者{pat}包括{len(rec_lst)}个子项")
         for rec_info in rec_lst: 
             if not isinstance(rec_info, dict): continue
             # print(rec_info["PATH"])
             extract_attrs_func = extract_attrs[rec_info["TYPE"]]
-            try: # extract_attrs_func 会去实际读取文件，凡是涉及到实际文件IO，都有可能已经损坏
-                rec_info.update(extract_attrs_func(rec_info["PATH"]))
-            except Exception as err: 
-                warnings.warn(f"When Retrieving Metainfo of {rec_info['PATH']}, {err}")
-                rec_info["BROKEN"] = True
-            
+            # try: # extract_attrs_func 会去实际读取文件，凡是涉及到实际文件IO，都有可能已经损坏
+            #     rec_info.update(extract_attrs_func(rec_info["PATH"]))
+            # except Exception as err: 
+            #     warnings.warn(f"When Retrieving Metainfo of {rec_info['PATH']}, {err}")
+            #     rec_info["BROKEN"] = True
+            rec_info.update(extract_attrs_func(rec_info["PATH"]))
+
+            ### 下面这个测试检测到了很多视频文件损坏，但是对性能影响较大因此默认不启用！
+            # if "video_lst" in rec_info: 
+            #     if not rec_info["video_lst"]: warnings.warn(f"{rec_info['PATH']}视频列表为空！")
+            #     import av
+            #     wh_lst = []
+            #     for video_file in rec_info["video_lst"]:
+            #         try: 
+            #             # 打开视频文件
+            #             container = av.open(os.path.join(rec_info['PATH'], video_file))
+                        
+            #             # 获取视频流
+            #             video_stream = next(s for s in container.streams if s.type == 'video')
+                        
+            #             # 打开的视频流中的宽度和高度就是视频的宽度和高度
+            #             wh_lst.append((video_stream.width, video_stream.height))
+            #         except Exception as err: 
+            #             warnings.warn(f"获取{video_file}时出现错误{err}")
+            #     counter = count_values(wh_lst)
+            #     if len(counter) > 1: 
+            #         warnings.warn(f"{rec_info['PATH']}对应的视频文件大小不一致！")
+            #     print(counter)
+
         # 将有"start_dt"的Dict和没有"start_dt"的Dict分开
         has_start_dt = [d for d in rec_lst if "start_dt" in d]
         no_start_dt = [d for d in rec_lst if "start_dt" not in d]        
@@ -121,30 +152,32 @@ class CheckableTreeview(ttk.Treeview):
 
 from tkinter import filedialog
 def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None: 
+    tree.scan_result = info
     tree.iid_2_info = dict()
+    def _recursive_insert(parent, children): 
+        for child in children: 
+            if isinstance(child, list): 
+                new_pat = tree.insert(parent, 'end', text=f"({len(child)})", 
+                            values=('☐', '', '', '', '', '', ''))
+                _recursive_insert(new_pat, child)
+            else: 
+                assert isinstance(child, dict)
+                leaf_node = tree.insert(parent, 'end', text=child["SHORTNAME"] if "SHORTNAME" in child else '', 
+                                            values=(
+                                            '☐', 
+                                            child["TYPE"] if "TYPE" in child else '', 
+                                            child["start_dt"].isoformat() if "start_dt" in child else '', 
+                                            str(child["timedelta"]) if "timedelta" in child else '', 
+                                            '', 
+                                            '👁' if "video_lst" in child else '', 
+                                            str(child)
+                                            ))
+                tree.iid_2_info[leaf_node] = child    
     for pat, rec_lst in info.items(): 
-        pat_node = tree.insert(root_node, 'end', text=pat[:4]+".."+pat[-4:] if len(pat) > 10 else pat, 
+        pat_node = tree.insert(root_node, 'end', text=(pat[:4]+".."+pat[-4:] if len(pat) > 10 else pat) + f"({len(rec_lst)})", 
                                values=('☐', '', '', '', '', '', ''))
-        def _recursive_insert(parent, children): 
-            for child in children: 
-                if isinstance(child, list): 
-                    new_pat = tree.insert(parent, 'end', text='', 
-                               values=('☐', '', '', '', '', '', ''))
-                    _recursive_insert(new_pat, child)
-                else: 
-                    assert isinstance(child, dict)
-                    leaf_node = tree.insert(parent, 'end', text=child["SHORTNAME"] if "SHORTNAME" in child else '', 
-                                             values=(
-                                                '☐', 
-                                                child["TYPE"] if "TYPE" in child else '', 
-                                                child["start_dt"].isoformat() if "start_dt" in child else '', 
-                                                child["timedelta"].isoformat() if "timedelta" in child else '', 
-                                                '', 
-                                                '👁' if "video_lst" in child else '', 
-                                                str(child)
-                                             ))
-                    tree.iid_2_info[leaf_node] = child
-    
+        _recursive_insert(pat_node, rec_lst)
+
     tree.update_checkbox(root_node)
 
 def select_directory(filemenu, tree):
@@ -152,33 +185,93 @@ def select_directory(filemenu, tree):
     directory_path = filedialog.askdirectory()
     if directory_path:
         display_info = scan_sort(directory_path)
-        root_node = tree.insert((directory_path[:4]+".."+directory_path[-4:] if len(directory_path) > 10 else directory_path), 
-                                'end', text='Root Node', values=('☐', '', '', '', '', '', ''))
+        root_node = tree.insert('', 'end',
+                                text=(directory_path[:4]+".."+directory_path[-4:] if len(directory_path) > 10 else directory_path), 
+                                values=('☐', '', '', '', '', '', ''))
         _insert_treenode(tree, root_node, display_info)
         filemenu.entryconfig("导出结果", state="normal")
         filemenu.entryconfig("选择目录", state="disabled")
 def save_file_as(tree):
+    #  datetime 和 timedelta 的 JSON 导出问题
     # 打开保存文件对话框并返回选择的文件路径
-    json_path = filedialog.asksaveasfilename(
+    json_path = filedialog.asksaveasfilename(title="保存扫描结果JSON", confirmoverwrite=True, 
         defaultextension=".json", filetypes=[("JSON files", "*.json")]
     )
-
-    # Helper function to recursively collect selected nodes
-    def collect_selected(item):
-        data = {}
-        if tree.checkboxes[item].get() > 0:  # Node is selected or partially selected
-            data['text'] = tree.item(item, 'text')
-            data['children'] = [collect_selected(child) for child in tree.get_children(item)]
-            data['children'] = [child for child in data['children'] if child]  # Remove empty dicts
-        return data if data else None
-
-    # Start the collection from the root node
-    selected_data = [collect_selected(child) for child in tree.get_children('')]
-    selected_data = [data for data in selected_data if data]  # Remove empty dicts
-
     # Save the collected data to a JSON file
-    with open(json_path, 'w') as outfile:
-        json.dump(selected_data, outfile, indent=4)
+    if json_path: 
+        from datetime import datetime, timedelta
+        # class DateTimeEncoder(json.JSONEncoder):
+        #     def default(self, o):
+        #         if isinstance(o, datetime):
+        #             return o.isoformat()
+        #         if isinstance(o, timedelta):
+        #             return str(o)
+        #         # if isinstance(o, bytes): 
+        #         #     return bytes.decode(errors="replace")
+        #         return super().default(o)
+            
+        def convert_to_json_serializable(dictionary):
+            if isinstance(dictionary, dict):
+                return {convert_to_json_serializable(key): convert_to_json_serializable(value) for key, value in dictionary.items()}
+            elif isinstance(dictionary, (list, tuple)):
+                return [convert_to_json_serializable(element) for element in dictionary]
+            elif isinstance(dictionary, datetime):
+                return dictionary.isoformat()
+            elif isinstance(dictionary, timedelta):
+                return str(dictionary)     
+            elif isinstance(dictionary, bytes): 
+                return dictionary.decode(errors="replace")       
+            else:
+                return dictionary
+        
+        from copy import deepcopy
+        # 在保存文件之前将字节类型的键转换为字符串类型
+        converted_dict = convert_to_json_serializable(deepcopy(tree.scan_result)) # deepcopy 应该是不需要的，不过为了保险
+        
+        ### Debug 代码
+        # from pprint import pprint
+
+        # def check_for_illegal(dictionary): 
+        #     if isinstance(dictionary, dict):
+        #         for key, value in dictionary.items(): 
+        #             check_for_illegal(key)
+        #             check_for_illegal(value)
+        #     elif isinstance(dictionary, (list, tuple)):
+        #         [check_for_illegal(element) for element in dictionary]
+        #     elif isinstance(dictionary, (int, float, str, bool)):
+        #         return      
+        #     else:
+        #         pprint(dictionary)
+        # check_for_illegal(converted_dict)
+
+        with open(json_path, 'wt') as outfile:
+            json.dump(converted_dict, outfile, indent=4, )
+    
+    txt_path = filedialog.asksaveasfilename(title="保存选中数据包的路径", confirmoverwrite=True, 
+        defaultextension=".txt", filetypes=[("Text files", "*.txt")]
+    )
+
+    if txt_path: 
+        # Helper function to recursively collect selected nodes
+        def collect_selected(item):
+            if tree.checkboxes[item].get() > 0:  # Node is selected or partially selected
+                if tree.get_children(item): 
+                    selected_paths_part = [collect_selected(child) for child in tree.get_children(item)]
+                    return '\n'.join([child for child in selected_paths_part if child]) # Remove empty
+                else: 
+                    return tree.iid_2_info[item]["PATH"]
+            else: 
+                return ''
+
+        # Start the collection from the root node
+        selected_paths_str = [collect_selected(child) for child in tree.get_children('')]
+        selected_paths_str = '\n'.join([data for data in selected_paths_str if data])  # Remove empty 
+        # Save the collected items to a .txt file
+        with open(txt_path, 'wt') as outfile:
+            outfile.write(selected_paths_str)
+
+
+
 
 # def select_vtmp_dir(): 
 #     ... # 建议检测到有任何视频预览窗口线程活动就不让设置，并用一个信息提示取代正常窗口    
@@ -214,32 +307,18 @@ def on_double_click(event, tree):
         column = tree.identify_column(event.x)
         if tree.heading(column)['text'] == "完整信息":
             item = tree.identify_row(event.y)
-            item_data = {
-                "name": tree.item(item, "text"),
-                "data": {
-                    "checked": tree.set(item, "checked"),
-                    "begin_time": tree.set(item, "begin_time"),
-                    "duration": tree.set(item, "duration"),
-                    "space": tree.set(item, "space"),
-                    # ... 添加其他需要展示的数据
-                }
-            }
-            JSONViewer(item_data)
+            JSONViewer(tree.iid_2_info[item])
 
         elif tree.heading(column)['text'] == "视频速览":
             item = tree.identify_row(event.y)
             if tree.parent(item) != "":  # 确保是叶子节点
                 video_preview = tree.set(item, column="preview")
                 if video_preview:  # 确保单元格内容非空
-                    video_path = tree.set(item, column="duration") + ".mp4"
-                    PreviewWindow(video_path)
-        
-        elif tree.heading(column)['text'] == "Name": 
-            item = tree.identify_row(event.y)
-            open_directory(tree.get_info_by_item[item]["PATH"])
+                    PreviewWindow(tree.iid_2_info[item]["PATH"], tree.iid_2_info[item]["video_lst"])
         
         elif tree.heading(column)['text'] == "占用空间": 
-            ... # get_dsize() 非阻塞式更新
+            item = tree.identify_row(event.y)
+            open_directory(tree.iid_2_info[item]["PATH"])
 
 def show_main_window(dbpath: Optional[str], tmppath: str): 
     if not os.path.isdir(tmppath): 
@@ -255,7 +334,7 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     
     root = tk.Tk()
     root.title("Checkable Treeview")
-    root.geometry("800x600")
+    root.geometry("1280x720")
 
     # Create the menu bar
     menu_bar = tk.Menu(root)
@@ -320,8 +399,9 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
 
     if dbpath is not None: 
         display_info = scan_sort(dbpath)
-        root_node = tree.insert((dbpath[:4]+".."+dbpath[-4:] if len(dbpath) > 10 else dbpath), 
-                                'end', text='Root Node', values=('☐', '', '', '', '', '', ''))
+        root_node = tree.insert('', 'end', 
+                                text=(dbpath[:4]+".."+dbpath[-4:] if len(dbpath) > 10 else dbpath), 
+                                values=('☐', '', '', '', '', '', ''))
         _insert_treenode(tree, root_node, display_info)    
 
     root.mainloop()    

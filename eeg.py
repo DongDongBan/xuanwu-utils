@@ -81,7 +81,7 @@ def scan_ndrj_patdir(patpath: str, pat_2_path: Dict) -> None:
                     "PATH": node.path, 
                     "TYPE": SRC_TYPE.NDRJ.name, 
                     "CONFIDENCE": node.contains_seg, 
-                    "SHORTNAME": pat_key[:4] + ".." + pat_key[:-4] if len(pat_key) > 10 else pat_key, 
+                    "SHORTNAME": pat_key[:4] + ".." + pat_key[-4:] if len(pat_key) > 10 else pat_key, 
                 })
             else: 
                 childs_info_list = []
@@ -121,8 +121,8 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         f"{topdir}-Seg1-CH1.ref", 
     }    
     if len(natus_files.intersection(files_present)) > 1: 
-        if (_loc := topdir.find('_')) != -1 and (_loc + 36) == len(topdir): 
-                pat_key = topdir[:topdir.find('_')]
+        if (_loc := topdir.find('_')) != -1 and (_loc + 1 + 36) == len(topdir): 
+                pat_key = topdir[:_loc]
         else:   pat_key = topdir
 
         video_lst = list(filter(lambda fn: fn.endswith(".avi"), files_present)); video_lst.sort()
@@ -132,7 +132,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
             "TYPE": SRC_TYPE.NATUS.name, 
             "CONFIDENCE": len(natus_files.intersection(files_present)) / len(natus_files), 
             # "SHORTNAME": topdir[(topdir.find('_')+1):(topdir.find('_')+5)] + ".." + topdir[-4:], 
-            "SHORTNAME": topdir[:4] + ".." + topdir[:-4] if len(topdir) > 10 else topdir, 
+            "SHORTNAME": topdir[:4] + ".." + topdir[-4:] if len(topdir) > 10 else topdir, 
         }
         if len(video_lst) > 0: this_elem["video_lst"] = video_lst
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
@@ -170,7 +170,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
             "PATH": toppath, 
             "TYPE": SRC_TYPE.NEURACLE.name, 
             "CONFIDENCE": len(neuracle_files.intersection(files_present)) / len(neuracle_files), 
-            "SHORTNAME": topdir[:4] + ".." + topdir[:-4] if len(topdir) > 10 else topdir, 
+            "SHORTNAME": topdir[:4] + ".." + topdir[-4:] if len(topdir) > 10 else topdir, 
         })
         
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
@@ -193,10 +193,11 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
                         if bdf_count == 1: this_elem["BROKEN"] = True
                         if "video_lst" in this_elem: 
                             this_elem["video_lst"] += video_lst  
-                        else: 
+                        elif video_lst: 
                             this_elem["video_lst"] = video_lst
                         for unrecognized_subpath in to_be_scaned_lst:
                             scan_datadir(unrecognized_subpath, pat_2_path)
+        if "video_lst" in this_elem: this_elem["video_lst"].sort()
 
     elif len(ndrj_db_files.intersection(files_present)) > 1: 
         with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
@@ -213,7 +214,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
             "PATH": toppath, 
             "TYPE": SRC_TYPE.NEUR_SUB.name, 
             "CONFIDENCE": len(neuracle_subdir_files.intersection(files_present)) / len(natus_files), 
-            "SHORTNAME": topdir[:4] + ".." + topdir[:-4] if len(topdir) > 10 else topdir, 
+            "SHORTNAME": topdir[:4] + ".." + topdir[-4:] if len(topdir) > 10 else topdir, 
         }     
         if len(video_lst) > 0: this_elem["video_lst"] = video_lst
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
@@ -231,7 +232,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
             "PATH": toppath, 
             "TYPE": SRC_TYPE.NDRJ_SUB.name, 
             "CONFIDENCE": len(ndrj_subdir_files.intersection(files_present)) / len(natus_files), 
-            "SHORTNAME": topdir[:4] + ".." + topdir[:-4] if len(topdir) > 10 else topdir, 
+            "SHORTNAME": topdir[:4] + ".." + topdir[-4:] if len(topdir) > 10 else topdir, 
         }     
 
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
@@ -285,40 +286,54 @@ import re
 # 从ent文件种提取出所有现存标注
 def extract_natus_attrs(dirpath: str) -> Dict:
     eegfile = join(dirpath, os.path.basename(dirpath)+".eeg")
+    val = dict()
+
+    content = None
     with OpenWithTimeout(eegfile, "rb") as f: 
         content = f.read()
-    start = 0
-    val = {}
-    for name in features:
-        left = content.find(name, start)
-        left += len(name)   # 对于每一个找到的键、值对，先原样dump出其值
-        if name.endswith(b'Time"'): # CreationTime, StudyRecordTime 的值是数值型
-            left += 1
-            right = content.find(b')', left)
-            val[name] = float(content[left:right])
-        else:                       # 其他属性是字符串型，有引号包围
-            left = content.find(b'"', left) + 1
-            right = content.find(b'"', left)
-            val[name] = content[left:right]
-        start = right + 1
+    if content is None: 
+        warnings.warn(f"无法读取EEG文件{eegfile}")
+        val["BROKEN"] = True        
+    else: 
+        for name in features:
+            if name.endswith(b'Time"'): # CreationTime, StudyRecordTime 的值是数值型
+                pattern = re.compile(b'\.' + name + b'\s*,\s*([0-9\.]+)')
+                match = pattern.search(content)
+                if match:
+                    val[name] = float(match.group(1))
+                else: 
+                    warnings.warn(f"无法从EEG文件{eegfile}中找到特征{name}")
+                    val["BROKEN"] = True
+            else: # 其他属性是字符串型，有引号包围
+                pattern = re.compile(b'\.' + name + b'\s*,\s*"([^"]*)"')
+                match = pattern.search(content)
+                if match:
+                    val[name] = match.group(1)
+                else: 
+                    warnings.warn(f"无法从EEG文件{eegfile}中找到特征{name}")  
+                    val["BROKEN"] = True                                      
 
-    patient = str(val[b'"FirstName"'] + val[b'"MiddleName"'] + val[b'"LastName"'], 
-                  encoding='ascii'  )
+    # patient = str(val[b'"FirstName"'] + val[b'"MiddleName"'] + val[b'"LastName"'], 
+    #               encoding='ascii'  )
     ret =   {
-              '患者姓名': patient, 
+            #   '患者姓名': patient, 
             #   'PGUID': str(val[b'"PatientGUID"'], encoding='ascii'), 
             #   '记录时间': _get_ct_str(val[b'"CreationTime"']), 
             #   'CTime': val[b'"CreationTime"'], 
             #   '持续时间': _get_srt_str(val[b'"StudyRecordTime"']), 
             #   'SRTime': val[b'"StudyRecordTime"'],
-              '记录名称': str(val[b'"StudyName"'], encoding='ascii'),
-              'start_dt': datetime(1899, 12, 30) + timedelta(days=val[b'"CreationTime"']), 
-              'timedelta': timedelta(seconds=val[b'"StudyRecordTime"'])
+              '记录名称': str(val[b'"StudyName"'], encoding='ascii') if b'"StudyName"' in val else '',
               **val
             }
+    
+    if b'"CreationTime"' in val: 
+              ret['start_dt'] = datetime(1899, 12, 30) + timedelta(days=val[b'"CreationTime"']) 
+    if b'"StudyRecordTime"' in val: 
+              ret['timedelta'] = timedelta(seconds=val[b'"StudyRecordTime"'])     
 
     content = None # 提取注释信息
-    with OpenWithTimeout(eegfile[:-3]+"ent", 'rb') as f:
+    entfile = eegfile[:-3]+"ent"
+    with OpenWithTimeout(entfile, 'rb') as f:
         content = f.read()
     
     if content is not None: 
@@ -327,7 +342,9 @@ def extract_natus_attrs(dirpath: str) -> Dict:
         matches = re.findall(pattern, content)
 
         if len(matches) > 0: ret["annotations"] = matches
-    else: ret["BROKEN"] = True
+    else: 
+        warnings.warn(f"无法读取{entfile}")
+        ret["BROKEN"] = True
 
     return ret
 
@@ -375,8 +392,10 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
         annotations = edf.readAnnotations()
         annt_lst = []
 
-        # 遍历每个注释，打印注释信息
-        for onset, duration, description in zip(annotations):
+        for i in range(len(annotations[0])):
+            onset = annotations[0][i]
+            duration = annotations[1][i]
+            description = annotations[2][i]
             annt_lst.append(f"Onset: {onset}  Duration: {duration}  Description: {description}")
 
         # 关闭文件
@@ -395,7 +414,7 @@ extract_attrs = {
     SRC_TYPE.NATUS.name: extract_natus_attrs, 
     SRC_TYPE.NEURACLE.name: extract_neuracle_attrs, 
     SRC_TYPE.NDRJ.name: extract_ndrj_attrs, 
-    SRC_TYPE.NEUR_SUB: _default_extract_attrs, 
-    SRC_TYPE.NDRJ_SUB: _default_extract_attrs, 
+    SRC_TYPE.NEUR_SUB.name: _default_extract_attrs, 
+    SRC_TYPE.NDRJ_SUB.name: _default_extract_attrs, 
     SRC_TYPE.UNKNOWN.name: _default_extract_attrs
 }

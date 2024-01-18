@@ -1,43 +1,15 @@
 import tkinter as tk
 from tkinter import ttk
 import threading
+from typing import List
 
 class PreviewWindow(tk.Toplevel):
-    def __init__(self, video_path, *args, **kwargs):
+    def __init__(self, title: str, video_path_lst: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.title("视频速览")
-        self.geometry("300x200")
+        self.title(title)
+        self.geometry("800x600")
 
-        self.video_path = video_path
-
-        self.thumbnail_button = ttk.Button(self, text="缩略图加载", command=self.load_thumbnail)
-        self.thumbnail_button.pack()
-
-        self.thumbnail_progress_text = tk.Text(self, height=1, width=20)
-        self.thumbnail_progress_text.pack()
-
-        self.video_button = ttk.Button(self, text="视频加载", command=self.load_video)
-        self.video_button.pack()
-
-        self.video_progress_text = tk.Text(self, height=1, width=20)
-        self.video_progress_text.pack()
-
-        self.progress = ttk.Progressbar(self, mode="indeterminate")
-        self.progress.pack(fill=tk.X, expand=True)
-
-        self.display_label = tk.Label(self, text="这里显示视频或缩略图")
-        self.display_label.pack(fill=tk.BOTH, expand=True)
-
-
-
-
-class PreviewWindow(tk.Toplevel):
-    def __init__(self, video_path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.title("视频速览")
-        self.geometry("600x400")
-
-        self.video_path = video_path
+        self.video_path_lst = video_path_lst
 
         # 第一排控件
         self.thumbnail_button = ttk.Button(self, text="缩略图加载")
@@ -54,9 +26,9 @@ class PreviewWindow(tk.Toplevel):
 
         # 配置列的权重，使其能够均匀分配宽度
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(1, weight=3)
         self.grid_columnconfigure(2, weight=1)
-        self.grid_columnconfigure(3, weight=1)
+        self.grid_columnconfigure(3, weight=3)
 
         # 分割线
         self.separator1 = ttk.Separator(self, orient='horizontal')

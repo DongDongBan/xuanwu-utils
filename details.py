@@ -7,16 +7,20 @@ class JSONViewer(tk.Toplevel):
     def __init__(self, json_data, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("详细信息")
-        self.geometry("300x600")
+        self.geometry("600x900")
+
+        # Create a frame for tree and scrollbars
+        frame = ttk.Frame(self)
+        frame.pack(expand=True, fill=tk.BOTH)
 
         # Create the treeview
-        self.tree = ttk.Treeview(self)
-        self.tree.pack(expand=True, fill=tk.BOTH)
+        self.tree = ttk.Treeview(frame)
+        self.tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
-        # Create the scrollbar
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
-        scrollbar.pack(side='right', fill='y')
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        # Create the vertical scrollbar
+        v_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
+        v_scrollbar.pack(side='right', fill='y')
+        self.tree.configure(yscrollcommand=v_scrollbar.set)
 
         # Create buttons
         expand_button = ttk.Button(self, text="展开所有", command=self.expand_all)
@@ -26,6 +30,7 @@ class JSONViewer(tk.Toplevel):
 
         # Populate the treeview with JSON data
         self.insert_json('', json_data)
+   
 
     # def insert_json(self, parent, json_data):
     #     if isinstance(json_data, dict):
