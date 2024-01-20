@@ -297,7 +297,7 @@ def extract_natus_attrs(dirpath: str) -> Dict:
     else: 
         for name in features:
             if name.endswith(b'Time"'): # CreationTime, StudyRecordTime 的值是数值型
-                pattern = re.compile(b'\.' + name + b'\s*,\s*([0-9\.]+)')
+                pattern = re.compile(rb'\.' + name + rb'\s*,\s*([0-9\.]+)')
                 match = pattern.search(content)
                 if match:
                     val[name] = float(match.group(1))
@@ -305,7 +305,7 @@ def extract_natus_attrs(dirpath: str) -> Dict:
                     warnings.warn(f"无法从EEG文件{eegfile}中找到特征{name}")
                     val["BROKEN"] = True
             else: # 其他属性是字符串型，有引号包围
-                pattern = re.compile(b'\.' + name + b'\s*,\s*"([^"]*)"')
+                pattern = re.compile(rb'\.' + name + rb'\s*,\s*"([^"]*)"')
                 match = pattern.search(content)
                 if match:
                     val[name] = match.group(1)

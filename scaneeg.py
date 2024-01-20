@@ -259,7 +259,7 @@ def save_file_as(tree):
                     selected_paths_part = [collect_selected(child) for child in tree.get_children(item)]
                     return '\n'.join([child for child in selected_paths_part if child]) # Remove empty
                 else: 
-                    return tree.iid_2_info[item]["PATH"]
+                    return os.path.abspath(tree.iid_2_info[item]["PATH"])
             else: 
                 return ''
 
@@ -314,7 +314,9 @@ def on_double_click(event, tree):
             if tree.parent(item) != "":  # 确保是叶子节点
                 video_preview = tree.set(item, column="preview")
                 if video_preview:  # 确保单元格内容非空
-                    PreviewWindow(tree.iid_2_info[item]["PATH"], tree.iid_2_info[item]["video_lst"])
+                    rec_info = tree.iid_2_info[item]
+                    PreviewWindow(rec_info["SHORTNAME"] if "SHORTNAME" in rec_info else rec_info["PATH"], 
+                                    rec_info["PATH"], rec_info["video_lst"], tree.tempdir)
         
         elif tree.heading(column)['text'] == "占用空间": 
             item = tree.identify_row(event.y)
@@ -393,6 +395,8 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     hsb = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
     hsb.pack(side='bottom', fill='x')
     tree.configure(xscrollcommand=hsb.set)
+
+    tree.tempdir = tmppath
 
     # Pack the treeview last so it fills the remaining space
     tree.pack(side='left', expand=True, fill=tk.BOTH)
