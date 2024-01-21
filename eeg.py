@@ -1,10 +1,15 @@
 import os
+import sys
 import json
 import warnings
 from os.path import join, getsize
 from datetime import datetime, timedelta
 from typing import Dict, List
 from enum import IntEnum
+
+import __main__
+if "DEBUG_MODE" in dir(__main__): DEBUG_MODE = __main__.DEBUG_MODE
+else:                             DEBUG_MODE = False
 
 class SRC_TYPE(IntEnum): 
     NATUS = 0
@@ -20,7 +25,38 @@ class SRC_TYPE(IntEnum):
 # class ScandirWithTimeout(): 
 #     ...
 
-OpenWithTimeout = open; ScandirWithTimeout = os.scandir
+from functools import partial
+# def OpenWithTimeout(path, mode, *args, **kwargs): 
+#     if "b" not in mode: 
+#         return open(path, mode, encoding="utf-8", *args, **kwargs)
+#     else: 
+#         return open(path, mode, *args, **kwargs)
+
+# TODO 下面的代码只是简单抑制了以下报错，并没有实现Timeout功能，待实现
+ScandirWithTimeout = os.scandir
+class OpenWithTimeout:
+    def __init__(self, file_name, mode, *args, **kwargs):
+        self.file_name = file_name
+        self.mode = mode
+        self.args = args
+        self.kwargs = kwargs
+        self.file = None
+    def __enter__(self):
+        try:
+            if "b" not in self.mode:
+                self.file = open(self.file_name, self.mode, encoding="utf-8", *(self.args), **(self.kwargs))
+            else: 
+                self.file = open(self.file_name, self.mode, *(self.args), **(self.kwargs))
+            return self.file
+        except FileNotFoundError:
+            warnings.warn(f"{self.file_name}文件不存在，该数据包可能已经损坏！")
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.file is not None: self.file.close()
+        if exc_type or exc_value or traceback: warnings.warn(f"获取{self.file}的过程中出现以下错误{exc_type}: {exc_value}]\n{traceback}")
+        return True
+
+# OpenWithTimeout = open; ScandirWithTimeout = os.scandir
 
 __all__ = ['SRC_TYPE', 'scan_datadir', 'get_dsize', 'extract_attrs']
 
@@ -63,7 +99,7 @@ def scan_ndrj_patdir(patpath: str, pat_2_path: Dict) -> None:
             if entry.is_dir():
                 child_node = build_ndrjdb_tree(entry.path, depth + 1)
                 if child_node is not None:
-                    if child_node.contains_seg: node.contains_seg = True
+                    if child_node.contains_seg and not node.contains_seg: node.contains_seg = True
                     node.children.append(child_node)
 
         return node
@@ -97,11 +133,18 @@ neuracle_subdir_files = {'data.bdf', 'spike.bdf'}
 
 def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
     files_present = set()
+    global DEBUG_MODE
+    if DEBUG_MODE: 
+        import time
+        start_time = time.time()
     with ScandirWithTimeout(toppath) as entries:
         for entry in entries:
             if entry.is_file():
                 filename = entry.name
                 files_present.add(filename)  
+    if DEBUG_MODE: 
+            _dt = time.time() - start_time
+            print(f"{toppath}: {_dt:.2f}s", file=sys.stdout if _dt < 0.4 else sys.stderr)
     topdir = os.path.basename(toppath)  
     natus_files = {
         f"{topdir}.eeg", 
@@ -121,6 +164,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         f"{topdir}-Seg1-CH1.ref", 
     }    
     if len(natus_files.intersection(files_present)) > 1: 
+        # 截取名称中_之前的部分作为pat_key
         if (_loc := topdir.find('_')) != -1 and (_loc + 1 + 36) == len(topdir): 
                 pat_key = topdir[:_loc]
         else:   pat_key = topdir
@@ -130,8 +174,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         this_elem = {
             "PATH": toppath, 
             "TYPE": SRC_TYPE.NATUS.name, 
-            "CONFIDENCE": len(natus_files.intersection(files_present)) / len(natus_files), 
-            # "SHORTNAME": topdir[(topdir.find('_')+1):(topdir.find('_')+5)] + ".." + topdir[-4:], 
+            "CONFIDENCE": len(natus_files.intersection(files_present)) / len(natus_files),  
             "SHORTNAME": topdir[:4] + ".." + topdir[-4:] if len(topdir) > 10 else topdir, 
         }
         if len(video_lst) > 0: this_elem["video_lst"] = video_lst
@@ -147,6 +190,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         content = None # 患者名字和开始时间
         with OpenWithTimeout(join(toppath, "ExamInfo.json"), "rt") as f: 
             content = f.read()
+        
         examinfo = dict(); this_elem = dict()
         try: 
             examinfo = json.loads(content)
@@ -281,9 +325,25 @@ features = [
 #     srsec = round(srtime)
 #     return '%2d时%2d分%2d秒' % (srsec // 3600, srsec % 3600 // 60, srsec % 60)
 
+def extract_bebug_timer(func): 
+    global DEBUG_MODE
+    if DEBUG_MODE: 
+        import time
+        def wrapper(dirpath: str): 
+            _t0 = time.time()
+            res = func(dirpath)
+            _dt = time.time() - _t0
+            print(f"{dirpath}: {_dt:.2f}s", file=sys.stdout if _dt < 0.4 else sys.stderr)
+            return res
+        return wrapper
+    else: 
+        return func
+
 import re
 # 从eeg文件的内容中提取出一个dict，包含患者姓名、记录时间、持续时间等信息
 # 从ent文件种提取出所有现存标注
+### TODO 这里好好使用结构化编程技术重构成异常安全的！！！
+@extract_bebug_timer
 def extract_natus_attrs(dirpath: str) -> Dict:
     eegfile = join(dirpath, os.path.basename(dirpath)+".eeg")
     val = dict()
@@ -348,6 +408,7 @@ def extract_natus_attrs(dirpath: str) -> Dict:
 
     return ret
 
+@extract_bebug_timer
 def extract_neuracle_attrs(dirpath: str) -> Dict: 
     ret = dict()
     content = None # 提取记录持续时间
@@ -367,7 +428,7 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
         ret["BROKEN"] = True
     
     try: 
-        from pyedflib import EdfReader
+        from robust_io import EdfReaderContextManager
     except ImportError: 
         warnings.warn(f"解析博睿康数据注释需要pyedflib，未能检测到改为使用备用方案")
         content = None # 提取注释
@@ -386,24 +447,26 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
             warnings.warn(f"{join(dirpath, 'RecordInfo.json')}缺键，数据包可能已经损坏！")
             ret["BROKEN"] = True        
     else: 
-        edf = EdfReader(join(dirpath, "evt.bdf"))
+        import contextlib
+        with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
+            with contextlib.suppress():      
+                with EdfReaderContextManager(join(dirpath, "evt.bdf")) as edf_reader: # 当这里出错时应该也要回退到降级措施！
+                    if edf_reader is not None:
+                        # 获取注释信息
+                        annotations = edf_reader.readAnnotations()
+                        annt_lst = []
 
-        # 获取注释信息
-        annotations = edf.readAnnotations()
-        annt_lst = []
-
-        for i in range(len(annotations[0])):
-            onset = annotations[0][i]
-            duration = annotations[1][i]
-            description = annotations[2][i]
-            annt_lst.append(f"Onset: {onset}  Duration: {duration}  Description: {description}")
-
-        # 关闭文件
-        edf.close()   
-        ret["annotations"] = annt_lst 
+                        for i in range(len(annotations[0])):
+                            onset = annotations[0][i]
+                            duration = annotations[1][i]
+                            description = annotations[2][i]
+                            annt_lst.append(f"Onset: {onset}  Duration: {duration}  Description: {description}")
+                        
+                        ret["annotations"] = annt_lst 
 
     return ret
 
+@extract_bebug_timer
 def extract_ndrj_attrs(dirpath: str) -> Dict: 
     return dict()
 

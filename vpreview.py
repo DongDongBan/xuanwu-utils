@@ -10,6 +10,10 @@ import numpy as np
 from typing import List
 from math import ceil, floor
 
+import __main__
+if "DEBUG_MODE" in dir(__main__): DEBUG_MODE = __main__.DEBUG_MODE
+else:                             DEBUG_MODE = False
+
 import warnings
 try: 
     from PIL import Image, ImageTk
@@ -249,6 +253,7 @@ class PreviewWindow(tk.Toplevel):
         self.thumbnail_loading_thread()
         # self.thumbnail_button.config(text="取消加载", command=self.cancel_thumbnail_loading)
         self.thumbnail_button.config(text="加载中...")
+        self.spinbox.config(state="disabled")
 
     def load_video(self):
         self.loading_video_event.set()

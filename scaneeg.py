@@ -3,13 +3,12 @@
 # @Version: 0.2.1
 # @Description: 这个脚本用来扫描筛选脑电记录，工作流程：
 #   1. 查找源目录dbpath下所有的数据包，并搜索同目录是否有脑电视频文件
-#   2. 拼接脑电视频文件至缓存目录tempdir，并人工预览视频打标签
+#   2. 拼接脑电视频文件至缓存目录tempdir，并人工预览视频勾选
 #   3. 输出筛选过后的数据包信息
-# @Usage: scaneeg.py [--temp-path tempdir] [dbpath]
+# @Usage: python scaneeg.py [--temp-path tempdir] [--debug] [dbpath]
 #   --temp-path 用于设置时频的临时加载目录，可以设置为内存盘从而提高运行速度
 # temp-path默认值tempfile.gettempdir()
 
-from eeg import scan_datadir, get_dsize, extract_attrs, SRC_TYPE
 import os
 import json
 import tempfile
@@ -50,27 +49,29 @@ def scan_sort(dbpath: str) -> Dict:
             #     rec_info["BROKEN"] = True
             rec_info.update(extract_attrs_func(rec_info["PATH"]))
 
+            global DEBUG_MODE
             ### 下面这个测试检测到了很多视频文件损坏，但是对性能影响较大因此默认不启用！
-            # if "video_lst" in rec_info: 
-            #     if not rec_info["video_lst"]: warnings.warn(f"{rec_info['PATH']}视频列表为空！")
-            #     import av
-            #     wh_lst = []
-            #     for video_file in rec_info["video_lst"]:
-            #         try: 
-            #             # 打开视频文件
-            #             container = av.open(os.path.join(rec_info['PATH'], video_file))
-                        
-            #             # 获取视频流
-            #             video_stream = next(s for s in container.streams if s.type == 'video')
-                        
-            #             # 打开的视频流中的宽度和高度就是视频的宽度和高度
-            #             wh_lst.append((video_stream.width, video_stream.height))
-            #         except Exception as err: 
-            #             warnings.warn(f"获取{video_file}时出现错误{err}")
-            #     counter = count_values(wh_lst)
-            #     if len(counter) > 1: 
-            #         warnings.warn(f"{rec_info['PATH']}对应的视频文件大小不一致！")
-            #     print(counter)
+            if DEBUG_MODE: 
+                if "video_lst" in rec_info: 
+                    if not rec_info["video_lst"]: warnings.warn(f"{rec_info['PATH']}视频列表为空！")
+                    import av
+                    wh_lst = []
+                    for video_file in rec_info["video_lst"]:
+                        try: 
+                            # 打开视频文件
+                            container = av.open(os.path.join(rec_info['PATH'], video_file))
+                            
+                            # 获取视频流
+                            video_stream = next(s for s in container.streams if s.type == 'video')
+                            
+                            # 打开的视频流中的宽度和高度就是视频的宽度和高度
+                            wh_lst.append((video_stream.width, video_stream.height))
+                        except Exception as err: 
+                            warnings.warn(f"获取{video_file}时出现错误{err}")
+                    counter = count_values(wh_lst)
+                    if len(counter) > 1: 
+                        warnings.warn(f"{rec_info['PATH']}对应的视频文件大小不一致！")
+                    print(counter)
 
         # 将有"start_dt"的Dict和没有"start_dt"的Dict分开
         has_start_dt = [d for d in rec_lst if "start_dt" in d]
@@ -272,20 +273,18 @@ def save_file_as(tree):
 
 
 
-
-# def select_vtmp_dir(): 
-#     ... # 建议检测到有任何视频预览窗口线程活动就不让设置，并用一个信息提示取代正常窗口    
-#     ... # 先显示当前的缓存路径右边一个浏览按钮，下边一个确定一个取消
-#     ... # 浏览按钮打开 filedialog.askdirectory() 选择新目录
-#     _, _, free = disk_usage(tmppath)
-#     if free <= 2 ** 31: 
-#         warnings.warn(f"缓存目录{tmppath}所在磁盘剩余空间不足2GB，建议重新设置")
-#     ... # 确定按钮回调需要回传更改属性，同时要检测并取消所有正在进行的加载工作
+# TODO 这个界面先简易实现下功能，待完善细节
+def select_vtmp_dir(tree): 
+    ... # 建议检测到有任何视频预览窗口线程活动就谨慎设置，并用一个信息提示取代正常窗口    
+    ... # 先显示当前的缓存路径右边一个浏览按钮，下边一个确定一个取消
+    tmppath = filedialog.askdirectory()
+    if tmppath:
+        _, _, free = disk_usage(tmppath)
+        if free <= 2 ** 31: 
+            warnings.warn(f"缓存目录{tmppath}所在磁盘剩余空间不足2GB，建议重新设置")
+    tree.tempdir = tmppath
     
 
-
-from details import JSONViewer
-from vpreview import PreviewWindow
 import subprocess
 import sys
 
@@ -352,11 +351,6 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     else: 
         file_menu.add_command(label="选择目录", command=lambda: select_directory(file_menu, tree))
         file_menu.add_command(label="导出结果", state="disabled", command=lambda: save_file_as(tree))        
-    
-    # 重设缓存需要检查的状态很多（因为缓存可能正在被别的线程使用），之后用比较熟悉的Qt或者Web写界面的时候再做
-    # setting_menu = tk.Menu(menu_bar, tearoff=0)
-    # menu_bar.add_cascade(label="设置", menu=file_menu)
-    # setting_menu.add_command(label="缓存目录", command=select_vtmp_dir)
 
     # Create a frame for the treeview and scrollbars
     frame = tk.Frame(root)
@@ -386,6 +380,19 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     # 绑定双击事件到 'on_info_click' 函数，并传递 'tree' 参数
     tree.bind("<Double-1>", lambda event: on_double_click(event, tree))
 
+    
+    tree.tempdir = tmppath
+    # 重新设置视频缓存目录
+    setting_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="设置", menu=file_menu)
+    setting_menu.add_command(label="缓存目录", command=lambda :select_vtmp_dir(tree))
+
+    # TODO 展开所有和折叠所有 待实现
+    setting_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="查看", menu=file_menu)
+    setting_menu.add_command(label="展开所有", command=..., state="disabled")    
+    setting_menu.add_command(label="折叠所有", command=..., state="disabled") 
+
     # Create vertical scrollbar
     vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     vsb.pack(side='right', fill='y')
@@ -395,8 +402,6 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     hsb = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
     hsb.pack(side='bottom', fill='x')
     tree.configure(xscrollcommand=hsb.set)
-
-    tree.tempdir = tmppath
 
     # Pack the treeview last so it fills the remaining space
     tree.pack(side='left', expand=True, fill=tk.BOTH)
@@ -414,11 +419,11 @@ if __name__ == '__main__':
     # 运行所需环境检查与参数的合法性检查
 
     parser = argparse.ArgumentParser(
-        usage='%(prog)s [--temp-path tempdir] [dbpath]',
+        usage='%(prog)s [--temp-path tempdir] [--debug] [dbpath]',
         description='这个脚本用来扫描筛选脑电记录信息',
         epilog='''脚本工作流程：
           1. 查找源目录dbpath下所有的数据包，并搜索同目录是否有脑电视频文件
-          2. 拼接脑电视频文件至缓存目录tempdir，并人工预览视频打标签
+          2. 拼接脑电视频文件至缓存目录tempdir，并人工预览视频勾选
           3. 导出筛选过后的数据包信息''',
         formatter_class=argparse.RawDescriptionHelpFormatter,
 
@@ -427,10 +432,19 @@ if __name__ == '__main__':
                         help='待扫描的目录')
     parser.add_argument('--temp-path', nargs=1, metavar="'tmpdir'", dest='tmpdir', 
                         help='用于设置视频的临时加载目录，可以设置为内存盘从而提高运行速度，temp-path默认值tempfile.gettempdir()')
+    parser.add_argument('--debug', action='store_true',  
+                        help='此选项默认禁用，当手动启用时会开启额外的数据完整性检查和系统性能测试（严重影响运行速度）')
     args = parser.parse_args()
 
     if args.tmpdir is None:
-        args.tmpdir = tempfile.gettempdir()    
+        args.tmpdir = tempfile.gettempdir()  
+    if args.debug: 
+        DEBUG_MODE = True
+    else: DEBUG_MODE = False   
     
+    from details import JSONViewer
+    from vpreview import PreviewWindow
+    from eeg import scan_datadir, get_dsize, extract_attrs, SRC_TYPE
+
     show_main_window(args.dbpath, args.tmpdir)   
         

@@ -3,6 +3,10 @@ import tkinter.ttk as ttk
 import json
 from datetime import datetime
 
+import __main__
+if "DEBUG_MODE" in dir(__main__): DEBUG_MODE = __main__.DEBUG_MODE
+else:                             DEBUG_MODE = False
+
 class JSONViewer(tk.Toplevel):
     def __init__(self, json_data, *args, **kwargs):
         super().__init__(*args, **kwargs)
