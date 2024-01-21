@@ -384,14 +384,14 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     tree.tempdir = tmppath
     # 重新设置视频缓存目录
     setting_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="设置", menu=file_menu)
+    menu_bar.add_cascade(label="设置", menu=setting_menu)
     setting_menu.add_command(label="缓存目录", command=lambda :select_vtmp_dir(tree))
 
     # TODO 展开所有和折叠所有 待实现
-    setting_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="查看", menu=file_menu)
-    setting_menu.add_command(label="展开所有", command=..., state="disabled")    
-    setting_menu.add_command(label="折叠所有", command=..., state="disabled") 
+    view_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="查看", menu=view_menu)
+    view_menu.add_command(label="展开所有", command=..., state="disabled")    
+    view_menu.add_command(label="折叠所有", command=..., state="disabled") 
 
     # Create vertical scrollbar
     vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
