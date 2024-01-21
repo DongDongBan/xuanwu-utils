@@ -447,9 +447,10 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
             warnings.warn(f"{join(dirpath, 'RecordInfo.json')}缺键，数据包可能已经损坏！")
             ret["BROKEN"] = True        
     else: 
-        import contextlib
-        with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
-            with contextlib.suppress():      
+        # 当 sys.getdefaultencoding() 不是 utf-8 时，pyedflib 有 bug，主要在 Windows 平台
+        # import contextlib
+        # with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
+        #     with contextlib.suppress():      
                 with EdfReaderContextManager(join(dirpath, "evt.bdf")) as edf_reader: # 当这里出错时应该也要回退到降级措施！
                     if edf_reader is not None:
                         # 获取注释信息
