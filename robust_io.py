@@ -1,5 +1,5 @@
 import warnings
-import pyedflib
+import EDFlib.edfreader as edfreader
 import os
 
 import __main__
@@ -16,7 +16,7 @@ class EdfReaderContextManager:
             warnings.warn(f"File not found: {self.filepath}")
             return None
         try:
-            self.edf_reader = pyedflib.EdfReader(self.filepath)
+            self.edf_reader = edfreader.EDFreader(self.filepath)
         except Exception as e:
             warnings.warn(f"An error occurred while opening the EDF file: {e}")
             self.edf_reader = None

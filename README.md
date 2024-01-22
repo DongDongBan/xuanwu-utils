@@ -19,7 +19,23 @@
 安装依赖库：
 
 ```shell
-pip install pyedflib pillow av
+pip install Edflib-Python pillow av
+```
+
+修改Edflib-Python的源代码放宽文件合规要求以读取博睿康不规范的evt.bdf文件！
+
+找到下面几行：
+
+```python
+    if self.__datarecords < 1:
+      return -13
+```
+
+替换为：
+
+```python
+    if self.__datarecords < 0:
+      return -13
 ```
 
 运行主程序

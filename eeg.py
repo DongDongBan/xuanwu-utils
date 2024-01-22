@@ -33,7 +33,24 @@ from functools import partial
 #         return open(path, mode, *args, **kwargs)
 
 # TODO 下面的代码只是简单抑制了以下报错，并没有实现Timeout功能，待实现
-ScandirWithTimeout = os.scandir
+class ScandirWithTimeout: 
+    def __init__(self, arg0, *args, **kwargs):
+        self.arg0 = arg0
+        self.args = args
+        self.kwargs = kwargs
+        self.file = None
+    def __enter__(self):
+        try: 
+            self.file = os.scandir(self.arg0, *(self.args), **(self.kwargs))
+            return self.file
+        except Exception as err:
+            warnings.warn(f"打开{self.arg0}的过程中出现以下错误{err}") 
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.file is not None: self.file.close()
+        if exc_type or exc_value or traceback: warnings.warn(f"遍历{self.arg0}的过程中出现以下错误{exc_type}: {exc_value}]\n{traceback}")
+        return True
+
 class OpenWithTimeout:
     def __init__(self, file_name, mode, *args, **kwargs):
         self.file_name = file_name
@@ -94,13 +111,14 @@ def scan_ndrj_patdir(patpath: str, pat_2_path: Dict) -> None:
 
         if depth == 3:
             return node
-
-        for entry in os.scandir(root_path):
-            if entry.is_dir():
-                child_node = build_ndrjdb_tree(entry.path, depth + 1)
-                if child_node is not None:
-                    if child_node.contains_seg and not node.contains_seg: node.contains_seg = True
-                    node.children.append(child_node)
+        
+        with ScandirWithTimeout(root_path) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+            for entry in entries:
+                if entry.is_dir():
+                    child_node = build_ndrjdb_tree(entry.path, depth + 1)
+                    if child_node is not None:
+                        if child_node.contains_seg and not node.contains_seg: node.contains_seg = True
+                        node.children.append(child_node)
 
         return node
     
@@ -181,7 +199,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
         else: pat_2_path[pat_key] = [this_elem]
 
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath)(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir() and entry.name != "Decimated":
                     scan_datadir(entry.path, pat_2_path)                        
@@ -222,7 +240,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         
         # 扫描子文件夹并获取可能存在的视频路径列表
         
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath)(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir():
                     bdf_count = 0; video_lst = []; to_be_scaned_lst = []
@@ -244,7 +262,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         if "video_lst" in this_elem: this_elem["video_lst"].sort()
 
     elif len(ndrj_db_files.intersection(files_present)) > 1: 
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for pat in entries:
                 if pat.is_dir():
                     scan_ndrj_patdir(pat.path, pat_2_path)
@@ -264,7 +282,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
         else: pat_2_path[pat_key] = [this_elem]
 
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir():
                     scan_datadir(entry.path, pat_2_path)    
@@ -282,13 +300,13 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
         else: pat_2_path[pat_key] = [this_elem]
 
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir():
                     scan_datadir(entry.path, pat_2_path)  
     
     else: 
-        with os.scandir(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir():
                     scan_datadir(entry.path, pat_2_path)          
@@ -430,7 +448,7 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
     try: 
         from robust_io import EdfReaderContextManager
     except ImportError: 
-        warnings.warn(f"解析博睿康数据注释需要pyedflib，未能检测到改为使用备用方案")
+        warnings.warn(f"解析博睿康数据注释需要Edflib-Python，未能检测到改为使用备用方案")
         content = None # 提取注释
         with OpenWithTimeout(join(dirpath, "RecordInfo.json"), "rt") as f: 
             content = f.read()
@@ -446,23 +464,16 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
         else: 
             warnings.warn(f"{join(dirpath, 'RecordInfo.json')}缺键，数据包可能已经损坏！")
             ret["BROKEN"] = True        
-    else: 
-        # 当 sys.getdefaultencoding() 不是 utf-8 时，pyedflib 有 bug，主要在 Windows 平台
-        # import contextlib
-        # with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
-        #     with contextlib.suppress():      
+    else:      
                 with EdfReaderContextManager(join(dirpath, "evt.bdf")) as edf_reader: # 当这里出错时应该也要回退到降级措施！
                     if edf_reader is not None:
-                        # 获取注释信息
-                        annotations = edf_reader.readAnnotations()
-                        annt_lst = []
 
-                        for i in range(len(annotations[0])):
-                            onset = annotations[0][i]
-                            duration = annotations[1][i]
-                            description = annotations[2][i]
+                        # 提取注释信息并格式化
+                        annt_lst = []
+                        for annt in edf_reader.annotationslist:
+                            onset, duration, description = annt.onset, annt.duration, annt.description
                             annt_lst.append(f"Onset: {onset}  Duration: {duration}  Description: {description}")
-                        
+                                            
                         ret["annotations"] = annt_lst 
 
     return ret
