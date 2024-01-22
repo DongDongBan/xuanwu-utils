@@ -15,6 +15,8 @@ import json
 import tempfile
 import argparse 
 import warnings
+import threading
+from queue import Queue
 from typing import Optional, Dict
 from shutil import disk_usage
 
@@ -152,10 +154,36 @@ class CheckableTreeview(ttk.Treeview):
         item = self.focus()
         self.update_checkbox(item)
 
+
+def format_size(size):
+    # 定义文件大小单位
+    units = ["B", "KB", "MB", "GB", "TB"]
+
+    # 逐级缩小文件大小，并选择合适的单位
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+
+    # 格式化文件大小为字符串，保留两位小数
+    formatted_size = f"{size:.2f} {units[unit_index]}"
+    return formatted_size
+
+def dsize_worker(queue, tree):
+    while True:
+        item = queue.get()
+        if item is None:
+            break
+        total_size = get_dsize(tree.iid_2_info[item]["PATH"])
+        cur_text = tree.set(item, column="space")
+        tree.set(item, column="space", value=cur_text+format_size(total_size))
+        queue.task_done()
+
 from tkinter import filedialog
 def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None: 
     tree.scan_result = info
     tree.iid_2_info = dict()
+    queue = Queue()
     def _recursive_insert(parent, children): 
         for child in children: 
             if isinstance(child, list): 
@@ -174,11 +202,18 @@ def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None:
                                             '👁' if "video_lst" in child else '', 
                                             str(child)
                                             ))
-                tree.iid_2_info[leaf_node] = child    
+                tree.iid_2_info[leaf_node] = child   
+                queue.put(leaf_node)
+    
+    # 创建线程队列和子线程
+
+    thread = threading.Thread(target=dsize_worker, args=(queue, tree))
+    thread.start()    
     for pat, rec_lst in info.items(): 
         pat_node = tree.insert(root_node, 'end', text=(pat[:4]+".."+pat[-4:] if len(pat) > 10 else pat) + f"({len(rec_lst)})", 
                                values=('☐', '', '', '', '', '', ''))
         _recursive_insert(pat_node, rec_lst)
+    queue.put(None)
 
     tree.update_checkbox(root_node)
 

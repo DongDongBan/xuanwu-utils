@@ -313,12 +313,15 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
 
 # 统计包含eeg的文件夹及其子文件夹占用空间的大小
 # TODO 可能耗时且可能因为软硬件错误卡死，改为支持取消的异步编程或者多线程编程
-def get_dsize(toppath: str) -> int:
-    ans = 0
-    for root, dirs, files in os.walk(toppath):
-        for name in files:
-            ans += getsize(join(root, name))
-    return ans                
+def get_dsize(path):
+    total_size = 0
+    with ScandirWithTimeout(path) as entries:
+        for entry in entries:
+            if entry.is_file():
+                total_size += entry.stat().st_size
+            elif entry.is_dir():
+                total_size += get_dsize(entry.path)
+    return total_size              
 
 features = [
               b'"FirstName"', 
