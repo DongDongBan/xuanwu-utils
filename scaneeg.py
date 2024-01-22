@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # @Author: DongDongBan
 # @Version: 0.2.1
+__version__ = "0.2.1"
 # @Description: 这个脚本用来扫描筛选脑电记录，工作流程：
 #   1. 查找源目录dbpath下所有的数据包，并搜索同目录是否有脑电视频文件
 #   2. 拼接脑电视频文件至缓存目录tempdir，并人工预览视频勾选
@@ -321,6 +322,18 @@ def on_double_click(event, tree):
             item = tree.identify_row(event.y)
             open_directory(tree.iid_2_info[item]["PATH"])
 
+# 展开所有节点
+def expand_all(tree, nodes):
+    for node in nodes:
+        tree.item(node, open=True)
+        expand_all(tree, tree.get_children(node))
+
+# 折叠所有节点
+def collapse_all(tree, nodes):
+    for node in nodes:
+        tree.item(node, open=False)
+        collapse_all(tree, tree.get_children(node))            
+
 def show_main_window(dbpath: Optional[str], tmppath: str): 
     if not os.path.isdir(tmppath): 
         warnings.warn(f"{tmppath}不是一个目录！已经重新设置为默认值，可以进入 设置 更改")
@@ -334,7 +347,7 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
             dbpath = None
     
     root = tk.Tk()
-    root.title("Checkable Treeview")
+    root.title(f"宣武医院临床数据扫描工具 v{__version__}")
     root.geometry("1280x720")
 
     # Create the menu bar
@@ -390,8 +403,8 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     # TODO 展开所有和折叠所有 待实现
     view_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="查看", menu=view_menu)
-    view_menu.add_command(label="展开所有", command=..., state="disabled")    
-    view_menu.add_command(label="折叠所有", command=..., state="disabled") 
+    view_menu.add_command(label="展开所有", command=lambda: expand_all(tree, tree.get_children()), state="disabled")    
+    view_menu.add_command(label="折叠所有", command=lambda: collapse_all(tree, tree.get_children()), state="disabled") 
 
     # Create vertical scrollbar
     vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
@@ -412,6 +425,8 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
                                 text=(dbpath[:4]+".."+dbpath[-4:] if len(dbpath) > 10 else dbpath), 
                                 values=('☐', '', '', '', '', '', ''))
         _insert_treenode(tree, root_node, display_info)    
+        view_menu.entryconfig("展开所有", state="normal")
+        view_menu.entryconfig("折叠所有", state="normal")
 
     root.mainloop()    
 

@@ -4,7 +4,7 @@
 
 ## 主要内容
 
-1. 支持博睿康、尼高力、国产机三种数据包的扫描GUI工具，用于筛选汇总需要收集的数据包
+1. 支持博睿康、尼高力、国产NDRJ三种数据包的扫描GUI工具，用于筛选汇总需要收集的数据包
 2. 支持将专有数据格式转换为EDF(+)公开格式的转换器，最好是跨平台的
 3. 提供常用CRUD操作的TB级脑电时序数据库
 
@@ -24,7 +24,7 @@ pip install Edflib-Python pillow av
 
 修改Edflib-Python的源代码放宽文件合规要求以读取博睿康不规范的evt.bdf文件！
 
-找到下面几行：
+找到${PYTHON_HOME}\Lib\site-packages\EDFlib\edfreader.py下面几行：
 
 ```python
     if self.__datarecords < 1:
@@ -44,7 +44,7 @@ pip install Edflib-Python pillow av
 python scaneeg.py
 ```
 
-可以使用--help了解具体使用方法
+可以使用--help了解更多使用方法
 
 ### 图形界面说明
 
