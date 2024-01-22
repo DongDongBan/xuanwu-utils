@@ -343,6 +343,11 @@ features = [
 #     srsec = round(srtime)
 #     return '%2d时%2d分%2d秒' % (srsec // 3600, srsec % 3600 // 60, srsec % 60)
 
+def _is_possile_sz(s: str, kws: List[str] = ['sz', 'seiz', 'onset', '发作', '癫痫']): 
+    s = s.lower()
+    if any([ kw in s for kw in kws ]):  return True
+    else:                               return False
+
 def extract_bebug_timer(func): 
     global DEBUG_MODE
     if DEBUG_MODE: 
@@ -419,7 +424,13 @@ def extract_natus_attrs(dirpath: str) -> Dict:
         # 例如这个(."Stamp", 2294), (."Text", "Montage:Cui_YiBing"), (."Type", "Annotation")
         matches = re.findall(pattern, content)
 
-        if len(matches) > 0: ret["annotations"] = matches
+        if len(matches) > 0: 
+            ret["annotations"] = matches
+            possible_seizure_cnt = 0
+            for _, text, _ in matches: 
+                if _is_possile_sz(text.decode()): possible_seizure_cnt += 1
+            if possible_seizure_cnt: ret["possible_seizure_cnt"] = possible_seizure_cnt
+
     else: 
         warnings.warn(f"无法读取{entfile}")
         ret["BROKEN"] = True
@@ -469,12 +480,14 @@ def extract_neuracle_attrs(dirpath: str) -> Dict:
                     if edf_reader is not None:
 
                         # 提取注释信息并格式化
-                        annt_lst = []
+                        annt_lst = []; possible_seizure_cnt = 0
                         for annt in edf_reader.annotationslist:
                             onset, duration, description = annt.onset, annt.duration, annt.description
                             annt_lst.append(f"Onset: {onset}  Duration: {duration}  Description: {description}")
-                                            
-                        ret["annotations"] = annt_lst 
+                            if _is_possile_sz(description): possible_seizure_cnt += 1
+                        if len(annt_lst) > 0:                     
+                            ret["annotations"] = annt_lst 
+                        if possible_seizure_cnt: ret["possible_seizure_cnt"] = possible_seizure_cnt                
 
     return ret
 

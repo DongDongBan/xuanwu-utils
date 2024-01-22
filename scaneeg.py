@@ -164,13 +164,13 @@ def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None:
                 _recursive_insert(new_pat, child)
             else: 
                 assert isinstance(child, dict)
-                leaf_node = tree.insert(parent, 'end', text=child["SHORTNAME"] if "SHORTNAME" in child else '', 
+                leaf_node = tree.insert(parent, 'end', text=(child["SHORTNAME"] if "SHORTNAME" in child else '') + f'({str(child.get("possible_seizure_cnt", ""))})', 
                                             values=(
                                             '☐', 
                                             child["TYPE"] if "TYPE" in child else '', 
                                             child["start_dt"].isoformat() if "start_dt" in child else '', 
                                             str(child["timedelta"]) if "timedelta" in child else '', 
-                                            '', 
+                                            '' if "BROKEN" not in child else '⚠', 
                                             '👁' if "video_lst" in child else '', 
                                             str(child)
                                             ))
