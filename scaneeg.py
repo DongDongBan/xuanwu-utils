@@ -187,12 +187,12 @@ def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None:
     def _recursive_insert(parent, children): 
         for child in children: 
             if isinstance(child, list): 
-                new_pat = tree.insert(parent, 'end', text=f"({len(child)})", 
+                new_pat = tree.insert(parent, 'end', text="", # f"({len(child)})", 
                             values=('☐', '', '', '', '', '', ''))
                 _recursive_insert(new_pat, child)
             else: 
                 assert isinstance(child, dict)
-                leaf_node = tree.insert(parent, 'end', text=(child["SHORTNAME"] if "SHORTNAME" in child else '') + f'({str(child.get("possible_seizure_cnt", ""))})', 
+                leaf_node = tree.insert(parent, 'end', text=(child["SHORTNAME"] if "SHORTNAME" in child else '') + f'(!{str(child.get("possible_seizure_cnt", 0))})', 
                                             values=(
                                             '☐', 
                                             child["TYPE"] if "TYPE" in child else '', 
@@ -210,14 +210,14 @@ def _insert_treenode(tree: CheckableTreeview, root_node, info: Dict) -> None:
     thread = threading.Thread(target=dsize_worker, args=(queue, tree))
     thread.start()    
     for pat, rec_lst in info.items(): 
-        pat_node = tree.insert(root_node, 'end', text=(pat[:4]+".."+pat[-4:] if len(pat) > 10 else pat) + f"({len(rec_lst)})", 
+        pat_node = tree.insert(root_node, 'end', text=(pat[:4]+".."+pat[-4:] if len(pat) > 10 else pat), # + f"({len(rec_lst)})", 
                                values=('☐', '', '', '', '', '', ''))
         _recursive_insert(pat_node, rec_lst)
     queue.put(None)
 
     tree.update_checkbox(root_node)
 
-def select_directory(filemenu, tree):
+def select_directory(filemenu, view_menu, tree):
     # 打开选择目录对话框并返回选择的路径
     directory_path = filedialog.askdirectory()
     if directory_path:
@@ -228,6 +228,10 @@ def select_directory(filemenu, tree):
         _insert_treenode(tree, root_node, display_info)
         filemenu.entryconfig("导出结果", state="normal")
         filemenu.entryconfig("选择目录", state="disabled")
+
+        tree.item(root_node, open=True)
+        view_menu.entryconfig("展开所有", state="normal")
+        view_menu.entryconfig("折叠所有", state="normal")        
 def save_file_as(tree):
     #  datetime 和 timedelta 的 JSON 导出问题
     # 打开保存文件对话框并返回选择的文件路径
@@ -394,10 +398,10 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
     menu_bar.add_cascade(label="文件", menu=file_menu)
 
     if dbpath is not None:         
-        file_menu.add_command(label="选择目录", state="disabled", command=lambda: select_directory(file_menu, tree))
+        file_menu.add_command(label="选择目录", state="disabled", command=lambda: select_directory(file_menu, view_menu, tree))
         file_menu.add_command(label="导出结果", command=lambda: save_file_as(tree)) 
     else: 
-        file_menu.add_command(label="选择目录", command=lambda: select_directory(file_menu, tree))
+        file_menu.add_command(label="选择目录", command=lambda: select_directory(file_menu, view_menu, tree))
         file_menu.add_command(label="导出结果", state="disabled", command=lambda: save_file_as(tree))        
 
     # Create a frame for the treeview and scrollbars
@@ -459,7 +463,9 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
         root_node = tree.insert('', 'end', 
                                 text=(dbpath[:4]+".."+dbpath[-4:] if len(dbpath) > 10 else dbpath), 
                                 values=('☐', '', '', '', '', '', ''))
-        _insert_treenode(tree, root_node, display_info)    
+        _insert_treenode(tree, root_node, display_info)  
+
+        tree.item(root_node, open=True)  
         view_menu.entryconfig("展开所有", state="normal")
         view_menu.entryconfig("折叠所有", state="normal")
 

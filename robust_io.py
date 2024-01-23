@@ -18,7 +18,7 @@ class EdfReaderContextManager:
         try:
             self.edf_reader = edfreader.EDFreader(self.filepath)
         except Exception as e:
-            warnings.warn(f"An error occurred while opening the EDF file: {e}")
+            warnings.warn(f"An error occurred while opening the EDF file {self.filepath}: {e}")
             self.edf_reader = None
         return self.edf_reader
 
@@ -27,7 +27,7 @@ class EdfReaderContextManager:
             try:
                 self.edf_reader.close()
             except Exception as e:
-                warnings.warn(f"An error occurred while closing the EDF file: {e}")
+                warnings.warn(f"An error occurred while closing the EDF file {self.filepath}: {e}")
         if exc_type or exc_value or traceback: warnings.warn(f"获取{self.filepath}的过程中出现以下错误{exc_type}: {exc_value}]\n{traceback}")
         return True  
 

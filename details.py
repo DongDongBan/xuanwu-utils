@@ -34,6 +34,7 @@ class JSONViewer(tk.Toplevel):
 
         # Populate the treeview with JSON data
         self.insert_json('', json_data)
+        self.expand_all()
    
 
     # def insert_json(self, parent, json_data):

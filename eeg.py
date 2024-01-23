@@ -199,7 +199,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         if pat_key in pat_2_path: pat_2_path[pat_key].append(this_elem)
         else: pat_2_path[pat_key] = [this_elem]
 
-        with ScandirWithTimeout(toppath)(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir() and entry.name != "Decimated":
                     scan_datadir(entry.path, pat_2_path)                        
@@ -240,7 +240,7 @@ def scan_datadir(toppath: str, pat_2_path: Dict[str, List[Dict]]) -> None:
         
         # 扫描子文件夹并获取可能存在的视频路径列表
         
-        with ScandirWithTimeout(toppath)(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
+        with ScandirWithTimeout(toppath) as entries: # 之前已经成功在有限时间内读取，此处可以用普通scandir
             for entry in entries:
                 if entry.is_dir():
                     bdf_count = 0; video_lst = []; to_be_scaned_lst = []
