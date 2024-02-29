@@ -58,6 +58,14 @@ python scaneeg.py
 * “占用空间”列如果有警告符号⚠，说明该行对应数据包存在已知损坏（检查项目很少，没有符号不代表一定没有损坏）
 * “视频预览”列如果有可视符号👁，说明该行对应数据包检测到了视频序列，反之则没有
 
+## 传输工具说明
+
+### Rclone跨平台同步命令
+
+0. 建议`rclone sync`或者`rclone copy`之前先用`rclone sync --dry-run -v source/ dest/`（注：此处不能带--checksum）或者类似`FreeFileSync`之类的软件快速比对一下两边目录的内容差异 
+1. 建议的实际同步命令参数（可自行阅读文档修改）`rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG`
+2. 拷贝本目录中的`rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和`MD5SUMS.txt`，检查一切正常后拷贝校验和文件至`dest-path`
+
 ## 格式转换器说明
 
 ### NATUS转换器EdfExport.exe
