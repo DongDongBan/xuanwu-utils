@@ -14,7 +14,7 @@
 
 ## 筛选工具使用说明
 
-本工具在3.11+的CPython版本上通过了一些简单的手工测试
+本工具在3.11+的CPython版本上进行了一些简单的手工测试
 
 安装依赖库：
 
@@ -60,11 +60,22 @@ python scaneeg.py
 
 ## 传输工具说明
 
-### Rclone跨平台同步命令
+### Rclone跨平台同步命令（使用非本地账户传输需要按照官网说明配置一下）
 
 0. 建议`rclone sync`或者`rclone copy`之前先用`rclone sync --dry-run -v source/ dest/`（注：此处不能带--checksum）或者类似`FreeFileSync`之类的软件快速比对一下两边目录的内容差异 
-1. 建议的实际同步命令参数（可自行阅读文档修改）`rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG`
-2. 拷贝本目录中的`rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和`MD5SUMS.txt`，检查一切正常后拷贝校验和文件至`dest-path`
+1. 建议的实际同步命令参数（可自行阅读文档修改）
+  ```cmd
+  %拷贝一个项目%
+  .\rclone.exe copy source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG
+  %拷贝多个项目%
+  .\rclone.exe copy --files-from source-list-file dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
+  %更新目标路径过时的文件%
+  .\rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
+  ```
+
+2. 拷贝本目录中的`rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和`MD5SUMS.txt`，检查一切正常后拷贝校验和文件至目标目录`dest-path`
+
+### FreeFileSync对比与同步工具
 
 ## 格式转换器说明
 
