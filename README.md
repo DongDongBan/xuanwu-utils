@@ -2,6 +2,8 @@
 
 适用于北京邮电大学-首都医科大学宣武医院脑科学相关合作项目的定制工具
 
+![临床数据收集分阶段优化方案](images/临床数据收集分阶段优化方案.png)
+
 ## 主要内容
 
 1. 支持博睿康、尼高力、国产NDRJ三种数据包的扫描GUI工具，用于筛选汇总需要收集的数据包
@@ -62,18 +64,19 @@ python scaneeg.py
 
 ### Rclone跨平台同步命令（使用非本地账户传输需要按照官网说明配置一下）
 
-0. 建议`rclone sync`或者`rclone copy`之前先用`rclone sync --dry-run -v source/ dest/`（注：此处不能带--checksum）或者类似`FreeFileSync`之类的软件快速比对一下两边目录的内容差异 
+0. 建议 `rclone sync`或者 `rclone copy`之前先用 `rclone sync --dry-run -v source/ dest/`（注：此处不能带--checksum）或者类似 `FreeFileSync`之类的软件快速比对一下两边目录的内容差异
 1. 建议的实际同步命令参数（可自行阅读文档修改）
-  ```cmd
+
+```cmd
   %拷贝一个项目%
   .\rclone.exe copy source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG
   %拷贝多个项目%
   .\rclone.exe copy --files-from source-list-file dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
   %更新目标路径过时的文件%
   .\rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
-  ```
+```
 
-2. 拷贝本目录中的`rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和`MD5SUMS.txt`，检查一切正常后拷贝校验和文件至目标目录`dest-path`
+2. 拷贝本目录中的 `rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和 `MD5SUMS.txt`，检查一切正常后拷贝校验和文件至目标目录 `dest-path`
 
 ### FreeFileSync对比与同步工具
 
@@ -84,3 +87,8 @@ python scaneeg.py
 解压edfexport.zip后请先检查是否已安装依赖项微软C++运行库2008 32位
 
 【注意事项】当给本转换器指派路径参数时，相对路径要使用POSIX格式即正斜杠作为分隔符，绝对路径不受影响
+
+## 后处理事项
+
+1. 有些片段对应时间区段重复，应该选取未被裁剪的原始数据作为主要依据！
+2. 有些发作被重复计数，需要手动整理时仔细甄别！
