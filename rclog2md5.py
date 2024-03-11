@@ -1,7 +1,17 @@
 import re 
+import argparse
+
+# 创建解析器对象
+parser = argparse.ArgumentParser(description='从rclone日志中提取md5校验和的脚本')
+
+parser.add_argument('-i', '--input-file', type=str, default='rclone.log', help='输入日志对应路径，默认为 ./rclone.log')
+
+parser.add_argument('-o', '--output-file', type=str, default='MD5SUMs.txt', help='输入日志对应路径，默认为 ./MD5SUMs.txt')
+# 解析命令行参数
+args = parser.parse_args()
 # 请根据你的实际日志文件路径修改下面的路径 
-log_file_path = 'rclone.log' 
-checksum_file_path = 'MD5SUMs.txt' 
+log_file_path = args.input_file 
+checksum_file_path = args.output_file
 # 正则表达式，用于从日志中匹配 MD5 校验和和文件名 
 # 假设日志中的行格式为 "MD5 hash of file.txt: 12345abcdef67890" 
 checksum_pattern = re.compile(r'DEBUG : ([^:]+): md5 = ([a-fA-F0-9]{32})') # DEBUG : idb/edfexport/Settings/Icu/ICU Waveforms.wks: md5 = 677975de6a15e03d0b88216d2b267c51 

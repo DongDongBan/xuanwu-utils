@@ -73,7 +73,7 @@ python scaneeg.py
   %拷贝多个项目%
   .\rclone.exe copy --files-from source-list-file dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
   %更新目标路径过时的文件%
-  .\rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
+  .\rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG --interactive 
 ```
 
 2. 拷贝本目录中的 `rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和 `MD5SUMS.txt`，检查一切正常后拷贝校验和文件至目标目录 `dest-path`
