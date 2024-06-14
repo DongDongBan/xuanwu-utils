@@ -88,6 +88,29 @@ python scaneeg.py
 
 【注意事项】当给本转换器指派路径参数时，相对路径要使用POSIX格式即正斜杠作为分隔符，绝对路径不受影响
 
+* 转换单个目录为edf:
+
+```cmd
+EDFExport.exe -s "G:\tao~ zhang_********" -edfplus -o D:\脑电组资料
+```
+
+*注意如果目录名中包含空格，作为命令行参数需要加引号！*
+*不要忘记添加 `-edfplus`！！！*
+*如果还想查询更多参数含义及用法，请键入 `EDFExport.exe --help`。*
+
+* 转换多个目录为edf(s):
+
+```cmd
+EDFExport.exe -f G:\raw_dir_list.txt -edfplus -o D:\脑电组资料
+```
+
+其中 `raw_dir_list.txt`是记录原始文件的目录。
+
+```text
+G:\Yue~ Congcong_********
+G:\tao~ zhang_********
+```
+
 ## 数据集规范化流程（草案）
 
 1. 使用 `scaneeg.py`区分原始数据记录与经过剪辑的子记录
@@ -97,6 +120,6 @@ python scaneeg.py
   以 `***`为例，导出筛选结果 `***_all.json`和 `***_long.txt`
 
 2. 以上一阶段输出的 `***_long.txt`为输入，使用格式转换器进行转码，并将结果归档至 `***_converted`子目录
-3. 使用 `rclone` + `rclog2md5.py`或者 `md5sum`一类的命令生成 `***`的所有内容检验和
+3. ~~使用 `rclone` + `rclog2md5.py`或者~~ `md5sum`一类的命令生成 `***`的所有内容检验和
 4. 更改 `***`访问权限为 `rwxr-xr-x`，所有者为 `root:root`，并移动或者链接至全程数据集总目录
-5. 生成plotinfo.json和timeline.html，请参考子目录[rec_quickview_gen](./rec_quickview_gen/README.md)的说明
+5. 生成plotinfo.json和timeline.html，请参考子目录[rec_quickview_gen](./rec_quickview_gen/README.md)的说明（需要安装可选包）
