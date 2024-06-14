@@ -226,13 +226,38 @@ def select_directory(filemenu, view_menu, tree):
                                 text=(directory_path[:4]+".."+directory_path[-4:] if len(directory_path) > 10 else directory_path), 
                                 values=('☐', '', '', '', '', '', ''))
         _insert_treenode(tree, root_node, display_info)
-        filemenu.entryconfig("导出结果", state="normal")
+        filemenu.entryconfig("导出选中项", state="normal")
+        filemenu.entryconfig("导出扫描结果JSON", state="normal")
         filemenu.entryconfig("选择目录", state="disabled")
 
         tree.item(root_node, open=True)
         view_menu.entryconfig("展开所有", state="normal")
         view_menu.entryconfig("折叠所有", state="normal")        
-def save_file_as(tree):
+def save_selected_as(tree):
+    txt_path = filedialog.asksaveasfilename(title="保存选中数据包的路径", confirmoverwrite=True, 
+        defaultextension=".txt", filetypes=[("Text files", "*.txt")]
+    )
+
+    if txt_path: 
+        # Helper function to recursively collect selected nodes
+        def collect_selected(item):
+            if tree.checkboxes[item].get() > 0:  # Node is selected or partially selected
+                if tree.get_children(item): 
+                    selected_paths_part = [collect_selected(child) for child in tree.get_children(item)]
+                    return '\n'.join([child for child in selected_paths_part if child]) # Remove empty
+                else: 
+                    return os.path.abspath(tree.iid_2_info[item]["PATH"])
+            else: 
+                return ''
+
+        # Start the collection from the root node
+        selected_paths_str = [collect_selected(child) for child in tree.get_children('')]
+        selected_paths_str = '\n'.join([data for data in selected_paths_str if data])  # Remove empty 
+        # Save the collected items to a .txt file
+        with open(txt_path, 'wt') as outfile:
+            outfile.write(selected_paths_str)
+
+def save_all_as(tree):
     #  datetime 和 timedelta 的 JSON 导出问题
     # 打开保存文件对话框并返回选择的文件路径
     json_path = filedialog.asksaveasfilename(title="保存扫描结果JSON", confirmoverwrite=True, 
@@ -287,31 +312,7 @@ def save_file_as(tree):
 
         with open(json_path, 'wt') as outfile:
             json.dump(converted_dict, outfile, indent=4, )
-    
-    txt_path = filedialog.asksaveasfilename(title="保存选中数据包的路径", confirmoverwrite=True, 
-        defaultextension=".txt", filetypes=[("Text files", "*.txt")]
-    )
-
-    if txt_path: 
-        # Helper function to recursively collect selected nodes
-        def collect_selected(item):
-            if tree.checkboxes[item].get() > 0:  # Node is selected or partially selected
-                if tree.get_children(item): 
-                    selected_paths_part = [collect_selected(child) for child in tree.get_children(item)]
-                    return '\n'.join([child for child in selected_paths_part if child]) # Remove empty
-                else: 
-                    return os.path.abspath(tree.iid_2_info[item]["PATH"])
-            else: 
-                return ''
-
-        # Start the collection from the root node
-        selected_paths_str = [collect_selected(child) for child in tree.get_children('')]
-        selected_paths_str = '\n'.join([data for data in selected_paths_str if data])  # Remove empty 
-        # Save the collected items to a .txt file
-        with open(txt_path, 'wt') as outfile:
-            outfile.write(selected_paths_str)
-
-
+        
 
 # TODO 这个界面先简易实现下功能，待完善细节
 def select_vtmp_dir(tree): 
@@ -399,10 +400,12 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
 
     if dbpath is not None:         
         file_menu.add_command(label="选择目录", state="disabled", command=lambda: select_directory(file_menu, view_menu, tree))
-        file_menu.add_command(label="导出结果", command=lambda: save_file_as(tree)) 
+        file_menu.add_command(label="导出选中项", command=lambda: save_selected_as(tree)) 
+        file_menu.add_command(label="导出扫描结果JSON", command=lambda: save_all_as(tree))
     else: 
         file_menu.add_command(label="选择目录", command=lambda: select_directory(file_menu, view_menu, tree))
-        file_menu.add_command(label="导出结果", state="disabled", command=lambda: save_file_as(tree))        
+        file_menu.add_command(label="导出选中项", state="disabled", command=lambda: save_selected_as(tree))   
+        file_menu.add_command(label="导出扫描结果JSON", state="disabled", command=lambda: save_all_as(tree))     
 
     # Create a frame for the treeview and scrollbars
     frame = tk.Frame(root)

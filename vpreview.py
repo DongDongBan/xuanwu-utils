@@ -222,6 +222,7 @@ class PreviewWindow(tk.Toplevel):
 
         # 绑定窗口大小变化事件，以便更新画布大小
         self.bind("<Configure>", self.on_resize)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # 用于控制加载线程的事件
         self.loading_thumbnail_event = threading.Event()
@@ -395,3 +396,8 @@ class PreviewWindow(tk.Toplevel):
         
         # 保存引用以防止被垃圾回收
         self.canvas.image = photo
+    def on_close(self): 
+        if getattr(self, 'instance_path', None):
+            from shutil import rmtree 
+            rmtree(self.instance_path, ignore_errors=True)
+        self.destroy()
