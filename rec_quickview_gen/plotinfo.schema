@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "record_lst": {
+        "type": "array",
+        "items": {
+        "type": "object",
+        "properties": {
+            "file": {
+            "type": "string",
+            "minLength": 5
+            },
+            "span": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+            },
+            "minItems": 2,
+            "maxItems": 2
+            },
+            "info": {
+            "type": "string",
+            "minLength": 5
+            }
+        },
+        "required": ["file", "span", "info"],
+        "additionalProperties": true
+        }
+    },
+    "seizure_lst": {
+        "type": "array",
+        "items": {
+        "type": "object",
+        "properties": {
+            "span": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+            },
+            "minItems": 2,
+            "maxItems": 2
+            },
+            "info": {
+            "type": "string",
+            "minLength": 5
+            }
+        },
+        "required": ["span", "info"],
+        "additionalProperties": true
+        }
+    },
+    "unused_rec_idx_lst": {
+        "type": "array",
+        "items": {
+            "type": "integer",
+            "minimum": 0
+        }
+    },
+    "dependencies": {
+        "unused_rec_idx_lst": ["record_lst"]
+    }
+  },
+  "required": ["record_lst", "seizure_lst", "unused_rec_idx_lst"],
+  "additionalProperties": true  
+}
