@@ -19,6 +19,7 @@ import threading
 from queue import Queue
 from typing import Optional, Dict
 from shutil import disk_usage
+from multiprocessing import freeze_support
 
 __author__ = 'github.com/DongDongBan'
 
@@ -476,6 +477,9 @@ def show_main_window(dbpath: Optional[str], tmppath: str):
 
 if __name__ == '__main__':
     # 运行所需环境检查与参数的合法性检查
+
+    # 打包程序时需要的样板代码
+    freeze_support()
 
     parser = argparse.ArgumentParser(
         usage='%(prog)s [--temp-path tempdir] [--debug] [dbpath]',
