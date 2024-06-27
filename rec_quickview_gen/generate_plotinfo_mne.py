@@ -13,7 +13,7 @@ parser.add_argument("--output_html",type=str,required=False)
 args = parser.parse_args()
 
 import os
-patient = os.path.basename(args.edf_dir)
+patient = os.path.basename(os.path.abspath(args.edf_dir))
 if not getattr(args, "outpt_json", None): setattr(args, "outpt_json", f"{patient}-plotinfo.json")
 if not getattr(args, "output_html", None): setattr(args, "output_html", f"{patient}-timeline.html")
 
@@ -68,6 +68,9 @@ for edf_path in record_fn_lst:
         #         "span": [start_dt, end_dt], 
         #         "info": f"{os.path.basename(edf_path)} of shape {pedf.signals_in_file, pedf.getNSamples()[0]}"
         #     })
+
+        annotations = mne.read_annotations(edf_path)
+
         with MNEEdfObjWrapper(edf_path, preload=False) as raw:
             start_dt = raw.info['meas_date']
             end_dt = start_dt + timedelta(seconds=(raw.n_times / raw.info['sfreq'])) # TODO 核查对于EDF-D情形下此算法是否正确
@@ -78,7 +81,7 @@ for edf_path in record_fn_lst:
                 "file": os.path.basename(edf_path),
                 "span": [start_dt, end_dt],
                 "info": f"{os.path.basename(edf_path)} of shape {len(raw.ch_names), raw.n_times}", 
-                "annotations": [(a['onset'], a['description']) for a in raw.annotations] if hasattr(raw, 'annotations') else []
+                "annotations": [(a['onset'], a['description']) for a in annotations] if len(annotations) else []
             })   
             
             # 检查跨文件通道一致性
@@ -88,7 +91,7 @@ for edf_path in record_fn_lst:
                 last_ch_names = raw.ch_names
 
             # TODO 非精准匹配可能的发作标注
-            for annt in raw.annotations: 
+            for annt in annotations: 
                 if _is_possile_sz(annt['description']): 
                     result_obj["seizure_lst"].append({
                         "span": [annt['orig_time'], annt['orig_time']+timedelta(seconds=annt['duration'])], 
