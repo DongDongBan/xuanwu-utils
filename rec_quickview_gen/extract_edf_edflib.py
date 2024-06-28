@@ -14,26 +14,28 @@ parser.add_argument("--outpt-json",type=str,required=False)
 parser.add_argument("--output-html",type=str,required=False)
 parser.add_argument("--outpt-npmemmap",type=bool,required=False) 
 parser.add_argument("--output-channel-figure",type=str,required=False)
-# parser.add_argument("--ignore_lst",type=str,nargs='?',required=False)
+# parser.add_argument("--dropout-list",type=str,nargs='?',required=False)
 
 args = parser.parse_args()
-patient = os.path.basename(os.path.abspath(args.edf_dir))
-if not getattr(args, "outpt_json", None): setattr(args, "outpt_json", f"{patient}-plotinfo.json")
-if not getattr(args, "output_html", None): setattr(args, "output_html", f"{patient}-timeline.html")
+patient = os.path.basename(os.path.abspath(args.edf-dir))
+if not getattr(args, "outpt-json", None): setattr(args, "outpt_json", f"{patient}-plotinfo.json")
+if not getattr(args, "output-html", None): setattr(args, "output_html", f"{patient}-timeline.html")
 
 # TODO 下面两个参数选型需要探讨
-if not getattr(args, "outpt_npmemmap", None): 
-    setattr(args, "outpt_npmemmap", False)
-if not getattr(args, "output_channel_figure", None): 
-    setattr(args, "output_channel_figure", f"{patient}-channel-figure.???")
+if not getattr(args, "outpt-npmemmap", None): 
+    setattr(args, "outpt-npmemmap", False)
+if not getattr(args, "output-channel-figure", None): 
+    setattr(args, "output-channel-figure", f"{patient}-channel-figure.???")
 
 # TODO 检查这个上下文管理器的正确性
+import warnings
 class EdfReaderWrapper(EDFreader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     def __enter__(self):
         return self
-    def __exit__(self, *args):
+    def __exit__(self, exc_type, exc_value, traceback):
+        warnings.warn(f"exec_type: {exc_type}, exc_value: {exc_value}, traceback: {traceback}")
         super().close()
 
 
@@ -59,7 +61,11 @@ def _is_possile_sz(s: str, kws: List[str] = ['sz', 'seiz', 'onset', '发作', '�
     if any([ kw in s for kw in kws ]):  return True
     else:                               return False
 
-def worker_func(edf_path: str, result_obj: dict): # 请将result_obj改为线程安全的结果队列
+from datetime import datetime, timedelta
+# 将下面用于接收结果的[]对象改为线程安全的queue
+result_obj = {"base_dir": os.path.abspath(args.edf_dir), 
+              "record_lst": [], "seizure_lst": [], "unused_rec_idx_lst": []}
+def worker_func(edf_path: str):
     print(f"Try loading {edf_path}")
 
     # TODO 请检查下列代码的正确性
@@ -71,18 +77,29 @@ def worker_func(edf_path: str, result_obj: dict): # 请将result_obj改为线程
     #     # assert all((FS := pedf.getSampleFrequencies()) == fs) # TODO 支持过滤非脑电数据通道
     #     result_obj["record_lst"].append({
     #         "file": os.path.basename(edf_path), 
-    #         # "span": [start_dt.isoformat(), end_dt.isoformat()], 
+    #         "shape": [len(pedf.getSignalLabels()), edf_len], 
+    #         "fs": fs,
     #         "span": [start_dt, end_dt], 
-    #         "info": f"{os.path.basename(edf_path)} of shape {pedf.signals_in_file, pedf.getNSamples()[0]}"
+    #         "info": f"{os.path.basename(edf_path)} of shape {pedf.signals_in_file, pedf.getNSamples()[0]}", 
+    #         "annotations": []
     #     })
 
     # TODO 请实现这几个函数
     def parse_datarecords(edf_path: str): 
         if args.outpt_npmemmap: 
-            parse_datarecords()
-        read_annotations()
-
-    annotations = parse_datarecords(edf_path)
+            datarr = np.memmap(f"{edf_path[:-4]}.dat",  dtype='float32', mode='w+', shape=[nchs, nsamps])
+        with EdfReaderWrapper(edf_path) as pedf:
+            for k, data_rec in enumerate(pedf.iterDataReecords()): 
+                if args.outpt_npmemmap: 
+                    datarr[:, k*step:k*step+step] = data_rec.getData()
+                annotations = read_annotations(data_rec.getAnnotations())
+                for annt in annotations: 
+                    if _is_possile_sz(annt['description']): 
+                        result_obj["seizure_lst"].append({
+                        "span": [annt['orig_time'], annt['orig_time']+timedelta(seconds=annt['duration'])], 
+                        "info": annt['description'] + f" Onset {annt['orig_time'].isoformat()}, last {annt['duration']}s"
+                    })
+        parse_datarecords(edf_path)
 
     ### TODO 请对照mne的实现，检查edflib信息提取是否完整
     # with MNEEdfObjWrapper(edf_path, preload=False) as raw:
@@ -112,11 +129,13 @@ def worker_func(edf_path: str, result_obj: dict): # 请将result_obj改为线程
     #                 "info": annt['description'] + f" Onset {annt['orig_time'].isoformat()}, last {annt['duration']}s"
     #             })
 
-# for edf_path in record_fn_lst: worker_func(edf_path)
+for edf_path in record_fn_lst: 
+    try:
+        worker_func(edf_path)
+    except ValueError as exp:
+        warnings.warn(f"ValueError from {exp}")    
 
 # TODO 使用任务队列和线程池分发任务
-# 将下面用于接收结果的list()改为线程安全的queue
-# result_obj = {"record_lst": [], "seizure_lst": [], "unused_rec_idx_lst": []}
 # from concurrent.futures import ThreadPoolExecutor
 # with ThreadPoolExecutor() as executor:
 #     for edf_path in record_fn_lst: executor.submit(worker_func, edf_path, result_obj)
@@ -127,7 +146,7 @@ result_obj["seizure_lst"].sort(key=lambda obj:obj["span"])
 import copy
 import json
 # for k, rec_info in enumerate(result_obj["record_lst"]):
-#     if rec_info["file"] in args.ignore_lst:
+#     if rec_info["file"] in args.dropout-list:
 #         result_obj["unused_rec_idx_lst"].append(k)
 json_obj = copy.deepcopy(result_obj)
 for rec_info in json_obj["record_lst"]:
@@ -135,7 +154,10 @@ for rec_info in json_obj["record_lst"]:
 for seiz_info in json_obj["seizure_lst"]:
     seiz_info["span"] = [seiz_info["span"][0].isoformat(), seiz_info["span"][1].isoformat()]
     
-# with open(os.path.join(plot_args_path, f'{entry.name}.json'), "wt") as fout:
+from jsonschema import validate
+with open('plotinfo.schema', 'r') as schema_file:
+    schema = json.load(schema_file)
+validate(json_obj, schema)
 with open(args.outpt_json, "wt") as fout:
     json.dump(json_obj, fout, indent=2)
 
