@@ -2,7 +2,7 @@ import mne
 import argparse
 
 parser = argparse.ArgumentParser(
-    usage='%(prog)s [--temp-path tempdir] [--debug] [dbpath]',
+    usage='%(prog)s ',
     description='这个脚本用来扫描筛选脑电记录信息',
 )
 parser.add_argument("--edf_dir",type=str)
