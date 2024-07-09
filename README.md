@@ -65,25 +65,7 @@ python scaneeg.py
 * “占用空间”列如果有警告符号⚠，则说明该行对应数据包存在已知损坏（注：具体信息请看标准错误输出，若没有⚠或错误信息输出，数据包依然可能有深度隐藏的损坏点）
 * “视频预览”列如果有可视符号👁，则说明该行对应数据包检测到了视频序列，反之则没有
 
-## 传输工具说明
-
-### Rclone跨平台同步命令（使用非本地账户传输需要按照官网说明配置一下）
-
-0. 建议 `rclone sync`或者 `rclone copy`之前先用 `rclone sync --dry-run -v source/ dest/`（注：此处不能带--checksum）或者类似 `FreeFileSync`之类的软件快速比对一下两边目录的内容差异
-1. 建议的实际同步命令参数（可自行阅读文档修改）
-
-```cmd
-  %拷贝一个项目%
-  .\rclone.exe copy source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG
-  %拷贝多个项目%
-  .\rclone.exe copy --files-from source-list-file dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG  
-  %更新目标路径过时的文件%
-  .\rclone.exe sync source-path dest-path --checksum --progress --use-mmap --log-file=rclone.log --log-level DEBUG --interactive 
-```
-
-2. 拷贝本目录中的 `rclog2md5.py`至rclone安装目录，并运行以从日志中提取校验和 `MD5SUMS.txt`，检查一切正常后拷贝校验和文件至目标目录 `dest-path`
-
-### FreeFileSync对比与同步工具
+## FreeFileSync对比与同步工具
 
 ## 格式转换器说明
 
@@ -114,6 +96,12 @@ EDFExport.exe -f G:\raw_dir_list.txt -edfplus -o D:\脑电组资料
 ```text
 G:\Yue~ Congcong_********
 G:\tao~ zhang_********
+```
+
+* 转换当前目录的所有子目录为edf(s)：
+
+```cmd
+EDFExport.exe -d . -edfplus -o D:\脑电组资料
 ```
 
 ## 数据集规范化流程（草案）
